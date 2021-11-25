@@ -6,13 +6,13 @@ main() {
   parse_cmdline_ "$@"
 
   # propagate $FILES to custom function
-  tfsec_ "$ARGS" "${FILES[*]}"
+  terrascan_ "$ARGS" "$FILES"
 }
 
-tfsec_() {
+terrascan_() {
   # consume modified files passed from pre-commit so that
-  # tfsec runs against only those relevant directories
-  for file_with_path in ${FILES[*]}; do
+  # terrascan runs against only those relevant directories
+  for file_with_path in $FILES; do
     file_with_path="${file_with_path// /__REPLACED__SPACE__}"
     paths[index]=$(dirname "$file_with_path")
 
@@ -22,7 +22,7 @@ tfsec_() {
   for path_uniq in $(echo "${paths[*]}" | tr ' ' '\n' | sort -u); do
     path_uniq="${path_uniq//__REPLACED__SPACE__/ }"
     pushd "$path_uniq" > /dev/null
-    tfsec $ARGS
+    terrascan scan -i terraform $ARGS
     popd > /dev/null
   done
 }
@@ -54,8 +54,7 @@ parse_cmdline_() {
     case $argv in
       -a | --args)
         shift
-        expanded_arg="${1//__GIT_WORKING_DIR__/$PWD}"
-        ARGS+=("$expanded_arg")
+        ARGS+=("$1")
         shift
         ;;
       --)
