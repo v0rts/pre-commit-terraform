@@ -1,14 +1,14 @@
-ARG TAG=3.9.7-alpine3.14
+ARG TAG=3.10.1-alpine3.15
 FROM python:${TAG} as builder
 
 WORKDIR /bin_dir
 
 RUN apk add --no-cache \
     # Builder deps
-    curl \
-    unzip && \
+    curl=~7 \
+    unzip=~6 && \
     # Upgrade pip for be able get latest Checkov
-    python3 -m pip install --upgrade pip
+    python3 -m pip install --no-cache-dir --upgrade pip
 
 ARG PRE_COMMIT_VERSION=${PRE_COMMIT_VERSION:-latest}
 ARG TERRAFORM_VERSION=${TERRAFORM_VERSION:-latest}
@@ -34,6 +34,8 @@ ARG TERRAGRUNT_VERSION=${TERRAGRUNT_VERSION:-false}
 ARG TERRASCAN_VERSION=${TERRASCAN_VERSION:-false}
 ARG TFLINT_VERSION=${TFLINT_VERSION:-false}
 ARG TFSEC_VERSION=${TFSEC_VERSION:-false}
+ARG TFUPDATE_VERSION=${TFUPDATE_VERSION:-false}
+ARG HCLEDIT_VERSION=${HCLEDIT_VERSION:-false}
 
 
 # Tricky thing to install all tools by set only one arg.
@@ -47,7 +49,9 @@ RUN if [ "$INSTALL_ALL" != "false" ]; then \
         echo "export TERRAGRUNT_VERSION=latest" >> /.env && \
         echo "export TERRASCAN_VERSION=latest" >> /.env && \
         echo "export TFLINT_VERSION=latest" >> /.env && \
-        echo "export TFSEC_VERSION=latest" >> /.env \
+        echo "export TFSEC_VERSION=latest" >> /.env && \
+        echo "export TFUPDATE_VERSION=latest" >> /.env && \
+        echo "export HCLEDIT_VERSION=latest" >> /.env \
     ; else \
         touch /.env \
     ; fi
@@ -57,8 +61,10 @@ RUN if [ "$INSTALL_ALL" != "false" ]; then \
 RUN . /.env && \
     if [ "$CHECKOV_VERSION" != "false" ]; then \
     ( \
+        apk add --no-cache gcc=~10 libffi-dev=~3 musl-dev=~1; \
         [ "$CHECKOV_VERSION" = "latest" ] && pip3 install --no-cache-dir checkov \
-        || pip3 install --no-cache-dir checkov==${CHECKOV_VERSION} \
+        || pip3 install --no-cache-dir checkov==${CHECKOV_VERSION}; \
+        apk del gcc libffi-dev musl-dev \
     ) \
     ; fi
 
@@ -97,7 +103,7 @@ RUN . /.env \
 RUN . /.env && \
     if [ "$TERRASCAN_VERSION" != "false" ]; then \
     ( \
-        TERRASCAN_RELEASES="https://api.github.com/repos/accurics/terrascan/releases" && \
+        TERRASCAN_RELEASES="https://api.github.com/repos/tenable/terrascan/releases" && \
         [ "$TERRASCAN_VERSION" = "latest" ] && curl -L "$(curl -s ${TERRASCAN_RELEASES}/latest | grep -o -E -m 1 "https://.+?_Linux_x86_64.tar.gz")" > terrascan.tar.gz \
         || curl -L "$(curl -s ${TERRASCAN_RELEASES} | grep -o -E "https://.+?${TERRASCAN_VERSION}_Linux_x86_64.tar.gz")" > terrascan.tar.gz \
     ) && tar -xzf terrascan.tar.gz terrascan && rm terrascan.tar.gz && \
@@ -124,6 +130,26 @@ RUN . /.env && \
     ) && chmod +x tfsec \
     ; fi
 
+# TFUpdate
+RUN . /.env && \
+    if [ "$TFUPDATE_VERSION" != "false" ]; then \
+    ( \
+        TFUPDATE_RELEASES="https://api.github.com/repos/minamijoyo/tfupdate/releases" && \
+        [ "$TFUPDATE_VERSION" = "latest" ] && curl -L "$(curl -s ${TFUPDATE_RELEASES}/latest | grep -o -E -m 1 "https://.+?_linux_amd64.tar.gz")" > tfupdate.tgz \
+        || curl -L "$(curl -s ${TFUPDATE_RELEASES} | grep -o -E -m 1 "https://.+?${TFUPDATE_VERSION}_linux_amd64.tar.gz")" > tfupdate.tgz \
+    ) && tar -xzf tfupdate.tgz tfupdate && rm tfupdate.tgz \
+    ; fi
+
+# hcledit
+RUN . /.env && \
+    if [ "$HCLEDIT_VERSION" != "false" ]; then \
+    ( \
+        HCLEDIT_RELEASES="https://api.github.com/repos/minamijoyo/hcledit/releases" && \
+        [ "$HCLEDIT_VERSION" = "latest" ] && curl -L "$(curl -s ${HCLEDIT_RELEASES}/latest | grep -o -E -m 1 "https://.+?_linux_amd64.tar.gz")" > hcledit.tgz \
+        || curl -L "$(curl -s ${HCLEDIT_RELEASES} | grep -o -E -m 1 "https://.+?${HCLEDIT_VERSION}_linux_amd64.tar.gz")" > hcledit.tgz \
+    ) && tar -xzf hcledit.tgz hcledit && rm hcledit.tgz \
+    ; fi
+
 # Checking binaries versions and write it to debug file
 RUN . /.env && \
     F=tools_versions_info && \
@@ -136,6 +162,8 @@ RUN . /.env && \
     (if [ "$TERRASCAN_VERSION"      != "false" ]; then echo "terrascan $(./terrascan version)" >> $F; else echo "terrascan SKIPPED" >> $F      ; fi) && \
     (if [ "$TFLINT_VERSION"         != "false" ]; then ./tflint --version >> $F;                      else echo "tflint SKIPPED" >> $F         ; fi) && \
     (if [ "$TFSEC_VERSION"          != "false" ]; then echo "tfsec $(./tfsec --version)" >> $F;       else echo "tfsec SKIPPED" >> $F          ; fi) && \
+    (if [ "$TFUPDATE_VERSION"       != "false" ]; then echo "tfupdate $(./tfupdate --version)" >> $F; else echo "tfupdate SKIPPED" >> $F       ; fi) && \
+    (if [ "$HCLEDIT_VERSION"        != "false" ]; then echo "hcledit $(./hcledit version)" >> $F;     else echo "hcledit SKIPPED" >> $F       ; fi) && \
     echo -e "\n\n" && cat $F && echo -e "\n\n"
 
 
@@ -144,9 +172,12 @@ FROM python:${TAG}
 
 RUN apk add --no-cache \
     # pre-commit deps
-    git \
+    git=~2 \
     # All hooks deps
-    bash
+    bash=~5 \
+    # pre-commit-hooks deps: https://github.com/pre-commit/pre-commit-hooks
+    musl-dev=~1 \
+    gcc=~10
 
 # Copy tools
 COPY --from=builder \
@@ -157,17 +188,20 @@ COPY --from=builder \
     /usr/local/bin/checkov* \
         /usr/bin/
 # Copy pre-commit packages
-COPY --from=builder /usr/local/lib/python3.9/site-packages/ /usr/local/lib/python3.9/site-packages/
+COPY --from=builder /usr/local/lib/python3.10/site-packages/ /usr/local/lib/python3.10/site-packages/
 # Copy terrascan policies
 COPY --from=builder /root/ /root/
 
 # Install hooks extra deps
 RUN if [ "$(grep -o '^terraform-docs SKIPPED$' /usr/bin/tools_versions_info)" = "" ]; then \
-        apk add --no-cache perl \
+        apk add --no-cache perl=~5 \
     ; fi && \
     if [ "$(grep -o '^infracost SKIPPED$' /usr/bin/tools_versions_info)" = "" ]; then \
-        apk add --no-cache jq \
-    ; fi
+        apk add --no-cache jq=~1 \
+    ; fi && \
+    # Fix git runtime fatal:
+    # unsafe repository ('/lint' is owned by someone else)
+    git config --global --add safe.directory /lint
 
 ENV PRE_COMMIT_COLOR=${PRE_COMMIT_COLOR:-always}
 

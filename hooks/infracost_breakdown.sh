@@ -1,76 +1,33 @@
 #!/usr/bin/env bash
 set -eo pipefail
 
+# globals variables
+# shellcheck disable=SC2155 # No way to assign to readonly variable in separate lines
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=_common.sh
+. "$SCRIPT_DIR/_common.sh"
+
 function main {
-  common::initialize
+  common::initialize "$SCRIPT_DIR"
   common::parse_cmdline "$@"
+  common::export_provided_env_vars "${ENV_VARS[@]}"
+  common::parse_and_export_env_vars
+  # shellcheck disable=SC2153 # False positive
   infracost_breakdown_ "${HOOK_CONFIG[*]}" "${ARGS[*]}"
 }
 
-function common::colorify {
-  # Colors. Provided as first string to first arg of function.
-  # shellcheck disable=SC2034
-  local -r red="$(tput setaf 1)"
-  # shellcheck disable=SC2034
-  local -r green="$(tput setaf 2)"
-  # shellcheck disable=SC2034
-  local -r yellow="$(tput setaf 3)"
-  # Color reset
-  local -r RESET="$(tput sgr0)"
-
-  # Params start #
-  local COLOR="${!1}"
-  local -r TEXT=$2
-  # Params end #
-
-  if [ "$PRE_COMMIT_COLOR" = "never" ]; then
-    COLOR=$RESET
-  fi
-
-  echo -e "${COLOR}${TEXT}${RESET}"
-}
-
-function common::initialize {
-  local SCRIPT_DIR
-  # get directory containing this script
-  SCRIPT_DIR="$(dirname "$(realpath "${BASH_SOURCE[0]}")")"
-
-  # source getopt function
-  # shellcheck source=lib_getopt
-  . "$SCRIPT_DIR/lib_getopt"
-}
-
-# common global arrays.
-# Populated in `parse_cmdline` and can used in hooks functions
-declare -a ARGS=()
-declare -a HOOK_CONFIG=()
-declare -a FILES=()
-function common::parse_cmdline {
-  local argv
-  argv=$(getopt -o a:,h: --long args:,hook-config: -- "$@") || return
-  eval "set -- $argv"
-
-  for argv; do
-    case $argv in
-      -a | --args)
-        shift
-        ARGS+=("$1")
-        shift
-        ;;
-      -h | --hook-config)
-        shift
-        HOOK_CONFIG+=("$1;")
-        shift
-        ;;
-      --)
-        shift
-        FILES=("$@")
-        break
-        ;;
-    esac
-  done
-}
-
+#######################################################################
+# Wrapper around `infracost breakdown` tool which checks and compares
+# infra cost based on provided hook_config
+# Environment variables:
+#   PRE_COMMIT_COLOR (string) If set to `never` - do not colorize output
+# Arguments:
+#   hook_config (string with array) arguments that configure hook behavior
+#   args (string with array) arguments that configure wrapped tool behavior
+# Outputs:
+#   Print out hook checks status (Passed/Failed), total monthly cost and
+#   diff, summary about infracost check (non-supported resources etc.)
+#######################################################################
 function infracost_breakdown_ {
   local -r hook_config="$1"
   local args
@@ -78,7 +35,7 @@ function infracost_breakdown_ {
 
   # Get hook settings
   IFS=";" read -r -a checks <<< "$hook_config"
-
+  # Suppress infracost color
   if [ "$PRE_COMMIT_COLOR" = "never" ]; then
     args+=("--no-color")
   fi
@@ -103,6 +60,7 @@ function infracost_breakdown_ {
     # $hook_config receives string like '1 > 2; 3 == 4;' etc.
     # It gets split by `;` into array, which we're parsing here ('1 > 2' ' 3 == 4')
     # Next line removes leading spaces, just for fancy output reason.
+    # shellcheck disable=SC2001 # Rule exception
     check=$(echo "$check" | sed 's/^[[:space:]]*//')
 
     # Drop quotes in hook args section. From:
@@ -119,7 +77,7 @@ function infracost_breakdown_ {
       check="${check:1:-1}"
     fi
 
-    operations=($(echo "$check" | grep -oE '[!<>=]{1,2}'))
+    mapfile -t operations < <(echo "$check" | grep -oE '[!<>=]{1,2}')
     # Get the very last operator, that is used in comparison inside `jq` query.
     # From the example below we need to pick the `>` which is in between `add` and `1000`,
     # but not the `!=`, which goes earlier in the `jq` expression
@@ -180,4 +138,4 @@ function infracost_breakdown_ {
   fi
 }
 
-[[ ${BASH_SOURCE[0]} != "$0" ]] || main "$@"
+[ "${BASH_SOURCE[0]}" != "$0" ] || main "$@"

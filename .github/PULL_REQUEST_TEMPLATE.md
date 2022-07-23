@@ -17,12 +17,12 @@ attention to anything that needs special consideration.
 
 We love pull requests that resolve an open pre-commit-terraform issue. If yours does, you
 can uncomment the below line to indicate which issue your PR fixes, for example
-"Fixes #123":
+"Fixes #123456":
 -->
 
 <!-- Fixes # -->
 
-### How has this code been tested
+### How can we test changes
 
 <!--
 Before reviewers can be confident in the correctness of this pull request, it

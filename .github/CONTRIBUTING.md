@@ -56,6 +56,10 @@ Script accept next options:
 | 5   | `RAW_TEST_`<br>`RESULTS_FILE_NAME` | `terraform_tfsec_pr123`                                                  | (Temporary) File where all test data will be stored. |
 <!-- markdownlint-enable no-inline-html -->
 
+> **Note:** To make test results repeatable and comparable, be sure that on the test machine nothing generates an unstable workload. During tests good to stop any other apps and do not interact with the test machine.
+>
+> Otherwise, for eg, when you watch Youtube videos during one test and not during other, test results can differ up to 30% for the same test.
+
 ### Run via BASH
 
 ```bash
@@ -68,8 +72,8 @@ sudo apt install -y datamash
 ### Run via Docker
 
 ```bash
-# Build `pre-commit` image
-docker build -t pre-commit --build-arg INSTALL_ALL=true .
+# Build `pre-commit-terraform` image
+docker build -t pre-commit-terraform --build-arg INSTALL_ALL=true .
 # Build test image
 docker build -t pre-commit-tests tests/
 # Run
@@ -114,10 +118,11 @@ You can use [this PR](https://github.com/antonbabenko/pre-commit-terraform/pull/
     * `docker build -t pre-commit --build-arg INSTALL_ALL=true .`
     * `docker build -t pre-commit --build-arg <NEW_HOOK>_VERSION=latest .`
     * `docker build -t pre-commit --build-arg <NEW_HOOK>_VERSION=<1.2.3> .`
-2. Add new hook to [`.pre-commit-hooks.yaml`](../.pre-commit-hooks.yaml)
-3. Create hook file. Don't forget to make it executable via `chmod +x /path/to/hook/file`.
-4. Test hook. How to do it is described in [Run and debug hooks locally](#run-and-debug-hooks-locally) section.
-5. Test hook one more time.
+2. Add Docker structure tests to [`.github/.container-structure-test-config.yaml`](.container-structure-test-config.yaml)
+3. Add new hook to [`.pre-commit-hooks.yaml`](../.pre-commit-hooks.yaml)
+4. Create hook file. Don't forget to make it executable via `chmod +x /path/to/hook/file`.
+5. Test hook. How to do it is described in [Run and debug hooks locally](#run-and-debug-hooks-locally) section.
+6. Test hook one more time.
     1. Push commit with hook file to GitHub
     2. Grab SHA hash of the commit
     3. Test hook using `.pre-commit-config.yaml`:

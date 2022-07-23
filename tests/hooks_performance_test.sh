@@ -17,6 +17,8 @@ function run_tests {
   RESULTS_DIR="$(pwd)/tests/results"
 
   cd "$TEST_DIR" || { echo "Specified TEST_DIR does not exist" && exit 1; }
+  # Cleanup
+  rm "$RESULTS_DIR/$FILE_NAME_TO_SAVE_TEST_RESULTS"
 
   for ((i = 1; i <= TEST_NUM; i++)); do
     {
@@ -42,33 +44,33 @@ function generate_table {
 | time command   | max    | min    | mean     | median |
 | -------------- | ------ | ------ | -------- | ------ |
 | users seconds  | $(
-    printf %"s\n" $users_seconds | datamash max 1
+    printf %"s\n" "$users_seconds" | datamash max 1
   ) | $(
-    printf %"s\n" $users_seconds | datamash min 1
+    printf %"s\n" "$users_seconds" | datamash min 1
   ) | $(
-    printf %"s\n" $users_seconds | datamash mean 1
-  ) | $(printf %"s\n" $users_seconds | datamash median 1) |
+    printf %"s\n" "$users_seconds" | datamash mean 1
+  ) | $(printf %"s\n" "$users_seconds" | datamash median 1) |
 | system seconds | $(
-    printf %"s\n" $system_seconds | datamash max 1
+    printf %"s\n" "$system_seconds" | datamash max 1
   ) | $(
-    printf %"s\n" $system_seconds | datamash min 1
+    printf %"s\n" "$system_seconds" | datamash min 1
   ) | $(
-    printf %"s\n" $system_seconds | datamash mean 1
-  ) | $(printf %"s\n" $system_seconds | datamash median 1) |
+    printf %"s\n" "$system_seconds" | datamash mean 1
+  ) | $(printf %"s\n" "$system_seconds" | datamash median 1) |
 | CPU %          | $(
-    printf %"s\n" $cpu | datamash max 1
+    printf %"s\n" "$cpu" | datamash max 1
   ) | $(
-    printf %"s\n" $cpu | datamash min 1
+    printf %"s\n" "$cpu" | datamash min 1
   ) | $(
-    printf %"s\n" $cpu | datamash mean 1
-  ) | $(printf %"s\n" $cpu | datamash median 1) |
+    printf %"s\n" "$cpu" | datamash mean 1
+  ) | $(printf %"s\n" "$cpu" | datamash median 1) |
 | Total time     | $(
-    printf %"s\n" $total_time | datamash max 1
+    printf %"s\n" "$total_time" | datamash max 1
   ) | $(
-    printf %"s\n" $total_time | datamash min 1
+    printf %"s\n" "$total_time" | datamash min 1
   ) | $(
-    printf %"s\n" $total_time | datamash mean 1
-  ) | $(printf %"s\n" $total_time | datamash median 1) |
+    printf %"s\n" "$total_time" | datamash mean 1
+  ) | $(printf %"s\n" "$total_time" | datamash median 1) |
 "
 }
 
@@ -80,8 +82,7 @@ function save_result {
 
   local FILE_NAME=${5:-"tests_result.md"}
 
-  echo -e "\n$DESCRIPTION" >> "tests/results/$FILE_NAME"
-  echo -e "$TABLE" >> "tests/results/$FILE_NAME"
+  echo -e "\n$DESCRIPTION\n$TABLE" >> "tests/results/$FILE_NAME"
   # shellcheck disable=SC2016,SC2128 # Irrelevant
   echo -e '
 <details><summary>Run details</summary>
